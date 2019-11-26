@@ -1,0 +1,11 @@
+type Query { 
+	_Subscription: GraphQLIOSubscription
+}
+
+type Mutation { 
+}
+
+ 
+type GraphQLIOSubscription {
+	subscribe:String
+}

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>2.2.1.RELEASE</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.thinkenterprise.graphqlio.server.gs</groupId>
+	<artifactId>com.thinkenterprise.graphqlio.server.gs</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>GraphQL-IO Server GS</name>
+	<description>GraphQL IO Library Server GraphQL Service</description>
+
+	<properties>
+		<java.version>1.8</java.version>
+	</properties>
+
+	<dependencies>
+	
+		<!-- GraphQL IO Application-->
+
+		<dependency>
+			<groupId>com.thinkenterprise.graphqlio.server.gtt</groupId>
+			<artifactId>com.thinkenterprise.graphqlio.server.gtt</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.thinkenterprise.graphqlio.server.gts</groupId>
+			<artifactId>com.thinkenterprise.graphqlio.server.gts</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.thinkenterprise.graphqlio.server.wsf</groupId>
+			<artifactId>com.thinkenterprise.graphqlio.server.wsf</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+	
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-json</artifactId>
+		</dependency>
+
+		<!-- Spring Boot Data with JPA -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!-- Spring Boot In Memory Data Server -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+		</dependency>
+		
+		<!-- GraphQL IO -->
+		
+		<!--  CBOR, msgPack Encoding -->
+		<dependency>
+			<groupId>co.nstant.in</groupId>
+			<artifactId>cbor</artifactId>
+			<version>0.8</version>
+		</dependency>
+
+		<dependency>
+		  <groupId>com.fasterxml.jackson.dataformat</groupId>
+		  <artifactId>jackson-dataformat-cbor</artifactId>
+		</dependency>		
+
+		<dependency>
+		    <groupId>org.msgpack</groupId>
+		    <artifactId>msgpack-core</artifactId>
+		    <version>0.8.3</version>
+		</dependency>
+
+		<!-- GraphQL Tools -->
+		<dependency>
+			<groupId>com.graphql-java-kickstart</groupId>
+			<artifactId>graphql-java-tools</artifactId>
+			<version>5.6.0</version>
+		</dependency>
+		<!-- GraphQL Tools Fix -->
+				
+		<dependency>
+			<groupId>org.jetbrains.kotlin</groupId>
+			<artifactId>kotlin-stdlib</artifactId>
+		</dependency>
+
+		<!-- GraphQL Spring Boot Starter -->
+<!-- 
+        <dependency>
+            <groupId>com.graphql-java</groupId>
+            <artifactId>graphql-spring-boot-starter</artifactId>
+            <version>5.0.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.graphql-java</groupId>
+            <artifactId>graphql-java-tools</artifactId>
+            <version>5.2.4</version>
+        </dependency>
+-->		
+		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+
+
+		<!-- Key Value Store -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		
+		<dependency>
+		  <groupId>it.ozimov</groupId>
+		  <artifactId>embedded-redis</artifactId>
+		  <version>0.7.2</version>
+		  <scope>test</scope>
+		</dependency>
+		
+		
+		<dependency>
+		<groupId>com.github.caryyu</groupId>
+		<artifactId>spring-embedded-redis-server</artifactId>
+		<version>1.1</version>
+		</dependency>		
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+		
+		<!-- Test -->
+		
+
+		<dependency>
+		    <groupId>org.junit.jupiter</groupId>
+		    <artifactId>junit-jupiter-engine</artifactId>
+		    <scope>test</scope>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.junit.vintage</groupId>
+					<artifactId>junit-vintage-engine</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
+		</dependency>
+	</dependencies>
+
+</project>
