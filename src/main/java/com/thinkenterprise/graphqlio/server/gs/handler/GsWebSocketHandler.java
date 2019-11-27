@@ -6,11 +6,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
@@ -32,17 +30,18 @@ import com.thinkenterprise.graphqlio.server.wsf.domain.WsfFrameType;
 import com.thinkenterprise.graphqlio.server.wsf.event.WsfInboundFrameEvent;
 
 import co.nstant.in.cbor.CborDecoder;
+import co.nstant.in.cbor.model.ByteString;
 import co.nstant.in.cbor.model.DataItem;
 
 @Component
-public class GsWebSocketHandler extends AbstractWebSocketHandler implements ApplicationListener<WsfInboundFrameEvent>{
+public class GsWebSocketHandler extends AbstractWebSocketHandler implements ApplicationListener<WsfInboundFrameEvent> {
 
 	private final Logger logger = LoggerFactory.getLogger(GsWebSocketHandler.class);
 
 	private final Map<String, GtsConnection> webSocketConnections = new ConcurrentHashMap<>();
 	private final Map<String, WebSocketSession> webSocketSessions = new ConcurrentHashMap<>();
 
-	private final WsfConverter requestConverter ;
+	private final WsfConverter requestConverter;
 
 	private final WsfConverter responseConverter;
 
@@ -51,30 +50,56 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	private final GsExecutionStrategy graphQLIOQueryExecution;
 
 	private final GtsEvaluation graphQLIOEvaluation;
-	
+
 	private final GsGraphQLSchemaCreator gsGraphQLSchemaCreator;
 
 	@Autowired
-	public GsWebSocketHandler	( ObjectMapper objectMapper
-								, GsExecutionStrategy executionStrategy
-								, GtsEvaluation evaluation
-								, GsGraphQLSchemaCreator schemaCreator) {
-		
-		requestConverter = new WsfConverter( objectMapper, WsfFrameType.GRAPHQLREQUEST);
-		responseConverter = new WsfConverter( objectMapper, WsfFrameType.GRAPHQLRESPONSE);
-		notifyerConverter = new WsfConverter( objectMapper, WsfFrameType.GRAPHQLNOTIFIER);
+	public GsWebSocketHandler(ObjectMapper objectMapper, GsExecutionStrategy executionStrategy,
+			GtsEvaluation evaluation, GsGraphQLSchemaCreator schemaCreator) {
+
+		requestConverter = new WsfConverter(objectMapper, WsfFrameType.GRAPHQLREQUEST);
+		responseConverter = new WsfConverter(objectMapper, WsfFrameType.GRAPHQLRESPONSE);
+		notifyerConverter = new WsfConverter(objectMapper, WsfFrameType.GRAPHQLNOTIFIER);
 		graphQLIOQueryExecution = executionStrategy;
 		graphQLIOEvaluation = evaluation;
 		gsGraphQLSchemaCreator = schemaCreator;
 	}
-	
+
 	@Override
 	protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
 
+		logger.info("GraphQLIO binary Handler received graphqlio message :" + message.getPayload());
+		logger.info("GraphQLIO binary Handler session :" + session);
+		logger.info("GraphQLIO binary Handler session ID :" + session.getId());
+		logger.info("GraphQLIO binary Handler this :" + this);
+		logger.info("GraphQLIO binary Handler Thread :" + Thread.currentThread());
+
+		// vom Client muß geschickt werden, was hier erwartet wird.
+		// zunächst wird hier nur ein einzelner ByteString erwartet,
+		// der mit einem Query-String im richtigen Format gefüllt ist.
 		List<DataItem> dataItems = CborDecoder.decode(message.getPayload().array());
+		logger.info("dataItems = " + dataItems);
 
-		System.out.print(dataItems);
+		if (dataItems.size() < 1) {
+			logger.info("no binary item to handle!");
 
+		} else if (dataItems.size() >= 1) {
+			if (dataItems.size() >= 2) {
+				logger.info("more binary items given; handling only 1 binary item as string input.");
+			}
+
+			DataItem dataItem = dataItems.get(0);
+			logger.info("dataItems[0] = " + dataItem);
+
+			if (dataItem instanceof ByteString) {
+				String input = new String(((ByteString) dataItem).getBytes());
+				logger.info("dataItem.input = " + input);
+				this.handleTextMessage(session, new TextMessage(input));
+
+			} else {
+				logger.info("NOT dataItem instanceof ByteString");
+			}
+		}
 	}
 
 	@Override
@@ -128,32 +153,30 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		webSocketSessions.remove(session.getId());
 	}
 
-	private void sendNotifierMessageToClients(Map<String, Set<String>> sids4cid, WsfFrame requestMessage) throws Exception {
-		
+	private void sendNotifierMessageToClients(Map<String, Set<String>> sids4cid, WsfFrame requestMessage)
+			throws Exception {
+
 		Set<String> cids = sids4cid.keySet();
-		
+
 		for (String cid : cids) {
-			WsfFrame message = WsfFrame.builder()
-													   .fid(requestMessage.getFid())
-													   .rid(requestMessage.getRid())
-													   .type(WsfFrameType.GRAPHQLNOTIFIER)
-													   .data(notifyerConverter.createData(sids4cid.get(cid))).build();
+			WsfFrame message = WsfFrame.builder().fid(requestMessage.getFid()).rid(requestMessage.getRid())
+					.type(WsfFrameType.GRAPHQLNOTIFIER).data(notifyerConverter.createData(sids4cid.get(cid))).build();
 			String frame = notifyerConverter.convert(message);
-			webSocketSessions.get(cid).sendMessage(new TextMessage(frame));;
+			webSocketSessions.get(cid).sendMessage(new TextMessage(frame));
+			;
 
 		}
-	
+
 	}
 
 	@Override
 	public void onApplicationEvent(WsfInboundFrameEvent event) {
 		try {
-			webSocketSessions.get(event.getCid()).sendMessage(new TextMessage(requestConverter.convert(event.getFrame())));
+			webSocketSessions.get(event.getCid())
+					.sendMessage(new TextMessage(requestConverter.convert(event.getFrame())));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-	
-	
-	
+
 }
