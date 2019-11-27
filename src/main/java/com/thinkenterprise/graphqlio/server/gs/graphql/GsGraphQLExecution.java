@@ -33,7 +33,7 @@ public class GsGraphQLExecution implements GsExecutionStrategy {
 		
 		// Build Execution Input from our GraphQL IO Context 
 		ExecutionInput executionInput = ExecutionInput.newExecutionInput()
-				.query(graphQLIOContext.getRequestMessage().getData()).context(graphQLIOContext).build();
+				.query(graphQLIOContext.getRequestMessage().getData()).context(graphQLIOContext.toGtsContext()).build();
 
 		// Execute 
 		ExecutionResult executionResult = graphQL.execute(executionInput);

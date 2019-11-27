@@ -10,8 +10,6 @@ import com.thinkenterprise.graphqlio.server.gs.graphql.GsGraphQLService;
 import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSchemaCreator;
 import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSimpleSchemaCreator;
 import com.thinkenterprise.graphqlio.server.gs.handler.GsWebSocketHandler;
-import com.thinkenterprise.graphqlio.server.wsf.converter.WsfConverter;
-import com.thinkenterprise.graphqlio.server.wsf.domain.WsfFrameType;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -19,9 +17,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -77,5 +72,4 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
     	registry.addHandler(this.handler, gsProperties.getEndpoint());   
 	}
     
-        
 }

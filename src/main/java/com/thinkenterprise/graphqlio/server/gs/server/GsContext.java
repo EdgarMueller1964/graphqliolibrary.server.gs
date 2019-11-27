@@ -2,6 +2,7 @@ package com.thinkenterprise.graphqlio.server.gs.server;
 
 import org.springframework.web.socket.WebSocketSession;
 
+import com.thinkenterprise.graphqlio.server.gts.context.GtsContext;
 import com.thinkenterprise.graphqlio.server.gts.tracking.GtsScope;
 import com.thinkenterprise.graphqlio.server.wsf.domain.WsfFrame;
 
@@ -49,6 +50,14 @@ public class GsContext {
 
 	public void setRequestMessage(WsfFrame requestMessage) {
 		this.requestMessage = requestMessage;
+	}
+	
+	public GtsContext toGtsContext( ) {
+		return GtsContext.builder()
+				.webSocketSession(webSocketSession)
+				.scope(scope)
+				.graphQLSchema(graphQLSchema)
+				.build();
 	}
 
 	public static Builder builder() {
