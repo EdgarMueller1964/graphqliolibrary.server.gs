@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessageUnpacker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,18 +76,42 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		logger.info("GraphQLIO binary Handler this :" + this);
 		logger.info("GraphQLIO binary Handler Thread :" + Thread.currentThread());
 
-		// vom Client muß geschickt werden, was hier erwartet wird.
-		// zunächst wird hier nur ein einzelner ByteString erwartet,
-		// der mit einem Query-String im richtigen Format gefüllt ist.
-		List<DataItem> dataItems = CborDecoder.decode(message.getPayload().array());
-		logger.info("dataItems = " + dataItems);
+		// try cbor first:
+		try {
+			// vom Client muß geschickt werden, was hier erwartet wird.
+			// zunächst wird hier nur ein einzelner ByteString erwartet,
+			// der mit einem Query-String im richtigen Format gefüllt ist.
 
-		if (dataItems.size() < 1) {
-			logger.info("no binary item to handle!");
+			List<DataItem> dataItems = CborDecoder.decode(message.getPayload().array());
+
+			// wenn keine Exception:
+			logger.info("dataItems = " + dataItems);
+			handleCbor(session, dataItems);
+
+		} catch (Exception e) {
+
+			// do msgPack second:
+			MessageUnpacker unpacker = MessagePack.newDefaultUnpacker(message.getPayload().array());
+
+			// vom Client muß geschickt werden, was hier erwartet wird.
+			// zunächst wird hier nur ein einzelner String erwartet,
+			// der mit einem Query-String im richtigen Format gefüllt ist.
+
+			String input = unpacker.unpackString();
+			unpacker.close();
+
+			logger.info("msgPack.input = " + input);
+			this.handleTextMessage(session, new TextMessage(input));
+		}
+	}
+
+	private void handleCbor(WebSocketSession session, List<DataItem> dataItems) throws Exception {
+		if (dataItems == null || dataItems.size() < 1) {
+			logger.info("no dataItems to handle!");
 
 		} else if (dataItems.size() >= 1) {
 			if (dataItems.size() >= 2) {
-				logger.info("more binary items given; handling only 1 binary item as string input.");
+				logger.info("more dataItems given; handling only 1 dataItems as string input.");
 			}
 
 			DataItem dataItem = dataItems.get(0);
