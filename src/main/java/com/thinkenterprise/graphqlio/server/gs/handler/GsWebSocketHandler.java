@@ -116,7 +116,9 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 		// Get the Connection, create a Scope and push it to the context
 		GtsConnection connection = webSocketConnections.get(session.getId());
-		GtsScope scope = GtsScope.builder().withQuery(requestMessage.getData()).build();
+		GtsScope scope = GtsScope.builder()
+									.withQuery(requestMessage.getData())
+									.withConnectionId(connection.getConnectionId()).build();
 		connection.addScope(scope);
 
 		// Create Context Information for Execution
@@ -135,6 +137,11 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 		// Evaluate Subscriptions and notify clients
 		List<String> sids = graphQLIOEvaluation.evaluateOutdatedSids(graphQLIOContext.getScope());
+
+		sids.forEach(sid -> {
+			logger.info("GraphQLIO Scope Evaluation: Scope ("+sid+") outdated");
+		});
+		
 		Map<String, Set<String>> sids4cid = graphQLIOEvaluation.evaluateOutdatedsSidsPerCid(sids,
 				webSocketConnections.values());
 		sendNotifierMessageToClients(sids4cid, requestMessage);
@@ -149,6 +156,10 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 	@Override
 	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+		GtsConnection connection = webSocketConnections.get(session.getId());
+		if (connection != null)
+			graphQLIOEvaluation.onCloseConnection(connection.getConnectionId());
+				
 		webSocketConnections.remove(session.getId());
 		webSocketSessions.remove(session.getId());
 	}
@@ -162,8 +173,10 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 			WsfFrame message = WsfFrame.builder().fid(requestMessage.getFid()).rid(requestMessage.getRid())
 					.type(WsfFrameType.GRAPHQLNOTIFIER).data(notifyerConverter.createData(sids4cid.get(cid))).build();
 			String frame = notifyerConverter.convert(message);
-			webSocketSessions.get(cid).sendMessage(new TextMessage(frame));
-			;
+			WebSocketSession sessionForCid = webSocketSessions.get(cid);
+			if (sessionForCid != null ) {
+				sessionForCid.sendMessage(new TextMessage(frame));				
+			}
 
 		}
 
