@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.msgpack.core.MessagePack;
@@ -139,13 +140,27 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 		// Convert Frame to Message
 		WsfFrame requestMessage = requestConverter.convert(message.getPayload());
-
+		
 		// Get the Connection, create a Scope and push it to the context
 		GtsConnection connection = webSocketConnections.get(session.getId());
-		GtsScope scope = GtsScope.builder()
-									.withQuery(requestMessage.getData())
-									.withConnectionId(connection.getConnectionId()).build();
-		connection.addScope(scope);
+		GtsScope scope = null;
+		/// check if request message is a Subscription message (any of unsubscribe, pause, resume) and retrieve scopeId 
+		/// returns valid UUID as String, null otherwise
+		
+		/// ToDo: check if Scope generation could be delegated to (Gts-)Resolver
+		/// and gts library holds GtsConnection map resp. GtsScope list 
+		
+		String scopeId = this.getSubscriptionScopeId(requestMessage.getData());
+		if (scopeId != null) {
+			scope = connection.getScopeById(scopeId);
+		}
+		
+		if (scope == null) {
+			scope = GtsScope.builder()
+										.withQuery(requestMessage.getData())
+										.withConnectionId(connection.getConnectionId()).build();
+			connection.addScope(scope);			
+		}
 
 		// Create Context Information for Execution
 		GsContext graphQLIOContext = GsContext.builder().webSocketSession(session)
@@ -170,6 +185,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		
 		Map<String, Set<String>> sids4cid = graphQLIOEvaluation.evaluateOutdatedsSidsPerCid(sids,
 				webSocketConnections.values());
+		
 		sendNotifierMessageToClients(sids4cid, requestMessage);
 
 	}
@@ -183,9 +199,11 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	@Override
 	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
 		GtsConnection connection = webSocketConnections.get(session.getId());
-		if (connection != null)
+		if (connection != null) {
+			/// connection scopes are implicitly garbage collected once connection is not referenced anymore
 			graphQLIOEvaluation.onCloseConnection(connection.getConnectionId());
-				
+			
+		}		
 		webSocketConnections.remove(session.getId());
 		webSocketSessions.remove(session.getId());
 	}
@@ -218,4 +236,27 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		}
 	}
 
+	
+	/// check if message is a "Subscription - mutation" and contains valid UUID 
+	private String getSubscriptionScopeId( String requestMessage ) {
+		if (requestMessage.contains("mutation")  &&  requestMessage.contains("_Subscription")) {
+			int indexOf = requestMessage.indexOf("sid:");
+			if (indexOf > 0) {
+				String uuidString = requestMessage.substring(indexOf);
+				if ( uuidString.length() > 0) {
+					try {
+						UUID uuid = UUID.fromString(uuidString);
+						return uuidString;
+					}
+					catch( IllegalArgumentException e) {
+						logger.info("GsWebSocketHandler::getSubscriptionScopeId: uuidString (" + uuidString +") does not represent a valid UUID");
+					}
+					
+				}
+			}			
+		}
+		
+		return null;
+	}
+	
 }
