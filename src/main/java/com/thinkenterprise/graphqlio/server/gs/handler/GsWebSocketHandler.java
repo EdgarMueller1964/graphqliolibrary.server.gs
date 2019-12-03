@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.SubProtocolCapable;
@@ -203,10 +204,14 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 			logger.info("GraphQLIO Scope Evaluation: Scope ("+sid+") outdated");
 		});
 		
-		Map<String, Set<String>> sids4cid = graphQLIOEvaluation.evaluateOutdatedsSidsPerCid(sids,
-				webSocketConnections.values());
+		if ( sids.size() > 0) {
+			Map<String, Set<String>> sids4cid = graphQLIOEvaluation.evaluateOutdatedsSidsPerCid(sids,
+					webSocketConnections.values());			
+			
+			if ( sids4cid.size() > 0)
+				sendNotifierMessageToClients(sids4cid, requestMessage);
+		}
 		
-		sendNotifierMessageToClients(sids4cid, requestMessage);
 	}
 
 	private void sendAnswerBackToClient(WebSocketSession session, String answerFrame) throws Exception {
@@ -338,20 +343,33 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	
 	/// check if message is a "Subscription - mutation" and contains valid UUID 
 	private String getSubscriptionScopeId( String requestMessage ) {
-		if (requestMessage.contains("mutation")  &&  requestMessage.contains("_Subscription")) {
-			int indexOf = requestMessage.indexOf("sid:");
+		
+		final String REQUEST_MESSAGE_PART_TYPE_MUTATION = "mutation";
+		final String REQUEST_MESSAGE_PART_TYPE_SUBSCRIPTION = "_Subscription";
+		final String REQUEST_MESSAGE_PART_SCOPE_ID = "sid:";
+		
+		
+		String message = StringUtils.deleteAny(requestMessage,  "\"");
+		message = StringUtils.deleteAny(message,  " ");
+		
+		if (message.contains(REQUEST_MESSAGE_PART_TYPE_MUTATION)  &&  
+				message.contains(REQUEST_MESSAGE_PART_TYPE_SUBSCRIPTION)) {
+			int indexOf = message.indexOf(REQUEST_MESSAGE_PART_SCOPE_ID);
 			if (indexOf > 0) {
-				String uuidString = requestMessage.substring(indexOf);
-				if ( uuidString.length() > 0) {
-					try {
-						UUID uuid = UUID.fromString(uuidString);
-						return uuidString;
+				indexOf += REQUEST_MESSAGE_PART_SCOPE_ID.length();
+				if (message.length() >= indexOf + 36) { ///36=length of textual representation of UUID
+					String uuidString = message.substring(indexOf, indexOf+36);    
+					if ( uuidString.length() > 0) {
+						try {
+							UUID uuid = UUID.fromString(uuidString);
+							return uuidString;
+						}
+						catch( IllegalArgumentException e) {
+							logger.info("GsWebSocketHandler::getSubscriptionScopeId: uuidString (" + uuidString +") does not represent a valid UUID");
+						}						
 					}
-					catch( IllegalArgumentException e) {
-						logger.info("GsWebSocketHandler::getSubscriptionScopeId: uuidString (" + uuidString +") does not represent a valid UUID");
-					}
-					
 				}
+				
 			}			
 		}
 		
