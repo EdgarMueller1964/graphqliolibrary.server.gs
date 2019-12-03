@@ -1,12 +1,15 @@
 package com.thinkenterprise.graphqlio.server.gs.handler;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.msgpack.core.MessageBufferPacker;
 import org.msgpack.core.MessagePack;
 import org.msgpack.core.MessageUnpacker;
 import org.slf4j.Logger;
@@ -16,7 +19,9 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.SubProtocolCapable;
 import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 
@@ -33,11 +38,17 @@ import com.thinkenterprise.graphqlio.server.wsf.domain.WsfFrameType;
 import com.thinkenterprise.graphqlio.server.wsf.event.WsfInboundFrameEvent;
 
 import co.nstant.in.cbor.CborDecoder;
+import co.nstant.in.cbor.CborEncoder;
+import co.nstant.in.cbor.CborException;
 import co.nstant.in.cbor.model.ByteString;
 import co.nstant.in.cbor.model.DataItem;
 
 @Component
-public class GsWebSocketHandler extends AbstractWebSocketHandler implements ApplicationListener<WsfInboundFrameEvent> {
+public class GsWebSocketHandler extends AbstractWebSocketHandler implements ApplicationListener<WsfInboundFrameEvent>, SubProtocolCapable {
+
+	public static final String SUB_PROTOCOL_TEXT = "text";
+	public static final String SUB_PROTOCOL_CBOR = "cbor";
+	public static final String SUB_PROTOCOL_MSGPACK = "msgpack";
 
 	private final Logger logger = LoggerFactory.getLogger(GsWebSocketHandler.class);
 
@@ -69,77 +80,86 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	}
 
 	@Override
-	protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
+	public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
 
-		logger.info("GraphQLIO binary Handler received graphqlio message :" + message.getPayload());
-		logger.info("GraphQLIO binary Handler session :" + session);
-		logger.info("GraphQLIO binary Handler session ID :" + session.getId());
-		logger.info("GraphQLIO binary Handler this :" + this);
-		logger.info("GraphQLIO binary Handler Thread :" + Thread.currentThread());
+		logger.info("GraphQLIO handleMessage received graphqlio message::getAcceptedProtocol = " + session.getAcceptedProtocol());
 
-		// try cbor first:
-		try {
-			// vom Client muß geschickt werden, was hier erwartet wird.
-			// zunächst wird hier nur ein einzelner ByteString erwartet,
-			// der mit einem Query-String im richtigen Format gefüllt ist.
+		if (SUB_PROTOCOL_TEXT.equalsIgnoreCase(session.getAcceptedProtocol())
+				&& message instanceof TextMessage) {
 
-			List<DataItem> dataItems = CborDecoder.decode(message.getPayload().array());
+			this.handleTextMessage(session, (TextMessage) message);
 
-			// wenn keine Exception:
-			logger.info("dataItems = " + dataItems);
-			handleCbor(session, dataItems);
+		} else if (SUB_PROTOCOL_CBOR.equalsIgnoreCase(session.getAcceptedProtocol())
+				&& message instanceof BinaryMessage) {
 
-		} catch (Exception e) {
+			this.handleCborMessage(session, (BinaryMessage) message);
 
-			// do msgPack second:
-			MessageUnpacker unpacker = MessagePack.newDefaultUnpacker(message.getPayload().array());
+		} else if (SUB_PROTOCOL_MSGPACK.equalsIgnoreCase(session.getAcceptedProtocol())
+				&& message instanceof BinaryMessage) {
 
-			// vom Client muß geschickt werden, was hier erwartet wird.
-			// zunächst wird hier nur ein einzelner String erwartet,
-			// der mit einem Query-String im richtigen Format gefüllt ist.
+			this.handleMsgPackMessage(session, (BinaryMessage) message);
 
-			String input = unpacker.unpackString();
-			unpacker.close();
-
-			logger.info("msgPack.input = " + input);
-			this.handleTextMessage(session, new TextMessage(input));
-		}
-	}
-
-	private void handleCbor(WebSocketSession session, List<DataItem> dataItems) throws Exception {
-		if (dataItems == null || dataItems.size() < 1) {
-			logger.info("no dataItems to handle!");
-
-		} else if (dataItems.size() >= 1) {
-			if (dataItems.size() >= 2) {
-				logger.info("more dataItems given; handling only 1 dataItems as string input.");
-			}
-
-			DataItem dataItem = dataItems.get(0);
-			logger.info("dataItems[0] = " + dataItem);
-
-			if (dataItem instanceof ByteString) {
-				String input = new String(((ByteString) dataItem).getBytes());
-				logger.info("dataItem.input = " + input);
-				this.handleTextMessage(session, new TextMessage(input));
-
-			} else {
-				logger.info("NOT dataItem instanceof ByteString");
-			}
+		} else {
+			// super.handleMessage(session, message);
+			this.handleTextMessage(session, (TextMessage) message);
 		}
 	}
 
 	@Override
 	protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
 
-		logger.info("GraphQLIO Handler received graphqlio message :" + message.getPayload());
-		logger.info("GraphQLIO Handler session :" + session);
-		logger.info("GraphQLIO Handler session ID :" + session.getId());
-		logger.info("GraphQLIO Handler this :" + this);
-		logger.info("GraphQLIO Handler Thread :" + Thread.currentThread());
+		logger.info("GraphQLIO handleTextMessage session :" + session);
+		logger.info("GraphQLIO handleTextMessage session ID :" + session.getId());
+		logger.info("GraphQLIO handleTextMessage this :" + this);
+		logger.info("GraphQLIO handleTextMessage Thread :" + Thread.currentThread());
+
+		this.handleStringMessage(session, message.getPayload());
+	}
+
+	protected void handleCborMessage(WebSocketSession session, BinaryMessage message) throws Exception {
+
+		logger.info("GraphQLIO handleCborMessage session :" + session);
+		logger.info("GraphQLIO handleCborMessage session ID :" + session.getId());
+		logger.info("GraphQLIO handleCborMessage this :" + this);
+		logger.info("GraphQLIO handleCborMessage Thread :" + Thread.currentThread());
+
+		// vom Client muß geschickt werden, was hier erwartet wird.
+		// zunächst wird hier nur ein einzelner ByteString erwartet,
+		// der mit einem Query-String im richtigen Format gefüllt ist.
+
+		String input = getFromCbor(message);
+		logger.info("cbor.input = " + input);
+
+		if (input != null) {
+			this.handleStringMessage(session, input);
+		} else {
+			logger.info("GraphQLIO handleCborMessage : NO valid CBOR message");
+		}
+	}
+
+	protected void handleMsgPackMessage(WebSocketSession session, BinaryMessage message) throws Exception {
+
+		logger.info("GraphQLIO handleMsgPackMessage session :" + session);
+		logger.info("GraphQLIO handleMsgPackMessage session ID :" + session.getId());
+		logger.info("GraphQLIO handleMsgPackMessage this :" + this);
+		logger.info("GraphQLIO handleMsgPackMessage Thread :" + Thread.currentThread());
+
+		// vom Client muß geschickt werden, was hier erwartet wird.
+		// zunächst wird hier nur ein einzelner String erwartet,
+		// der mit einem Query-String im richtigen Format gefüllt ist.
+
+		String input = getFromMsgPack(message);
+		logger.info("msgPack.input = " + input);
+
+		this.handleStringMessage(session, input);
+	}
+
+	protected void handleStringMessage(WebSocketSession session, String message) throws Exception {
+
+		logger.info("GraphQLIO handle String message = " + message);
 
 		// Convert Frame to Message
-		WsfFrame requestMessage = requestConverter.convert(message.getPayload());
+		WsfFrame requestMessage = requestConverter.convert(message);
 		
 		// Get the Connection, create a Scope and push it to the context
 		GtsConnection connection = webSocketConnections.get(session.getId());
@@ -171,10 +191,10 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		graphQLIOQueryExecution.execute(graphQLIOContext);
 
 		// Convert Result Message to Frame
-		String frame = responseConverter.convert(graphQLIOContext.getResponseMessage());
+		String answerFrame = responseConverter.convert(graphQLIOContext.getResponseMessage());
 
 		// Send back
-		session.sendMessage(new TextMessage(frame));
+		sendAnswerBackToClient(session, answerFrame);
 
 		// Evaluate Subscriptions and notify clients
 		List<String> sids = graphQLIOEvaluation.evaluateOutdatedSids(graphQLIOContext.getScope());
@@ -187,7 +207,86 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 				webSocketConnections.values());
 		
 		sendNotifierMessageToClients(sids4cid, requestMessage);
+	}
 
+	private void sendAnswerBackToClient(WebSocketSession session, String answerFrame) throws Exception {
+
+		logger.info("GraphQLIO sendAnswerBackToClient::getAcceptedProtocol = " + session.getAcceptedProtocol());
+
+		if (SUB_PROTOCOL_TEXT.equalsIgnoreCase(session.getAcceptedProtocol())) {
+
+			session.sendMessage(new TextMessage(answerFrame));
+
+		} else if (SUB_PROTOCOL_CBOR.equalsIgnoreCase(session.getAcceptedProtocol())) {
+
+			session.sendMessage(createFromStringCbor(answerFrame));
+
+		} else if (SUB_PROTOCOL_MSGPACK.equalsIgnoreCase(session.getAcceptedProtocol())) {
+
+			session.sendMessage(createFromStringMsgPack(answerFrame));
+
+		} else {
+			// DEFAULT is TEXT:
+			session.sendMessage(new TextMessage(answerFrame));
+		}
+	}
+
+	public static String getFromCbor(BinaryMessage message) throws CborException {
+		List<DataItem> dataItems = CborDecoder.decode(message.getPayload().array());
+
+		// wenn keine Exception:
+		if (dataItems == null || dataItems.size() < 1) {
+			// logging
+
+		} else if (dataItems.size() >= 1) {
+			if (dataItems.size() >= 2) {
+				// logging
+			}
+
+			DataItem dataItem = dataItems.get(0);
+			// logging
+
+			if (dataItem instanceof ByteString) {
+				String input = new String(((ByteString) dataItem).getBytes());
+				// logging
+
+				return input;
+
+			} else {
+				// logging
+			}
+		}
+
+		// logging
+		return null;
+	}
+
+	public static String getFromMsgPack(BinaryMessage message) throws IOException {
+		MessageUnpacker unpacker = MessagePack.newDefaultUnpacker(message.getPayload().array());
+
+		String input = unpacker.unpackString();
+		// logging
+		unpacker.close();
+
+		return input;
+	}
+
+	public static BinaryMessage createFromStringCbor(String message) throws CborException {
+		byte[] bytes = message.getBytes();
+		DataItem dataItem = new ByteString(bytes);
+
+		ByteArrayOutputStream os = new ByteArrayOutputStream();
+		new CborEncoder(os).encode(dataItem);
+
+		return new BinaryMessage(os.toByteArray());
+	}
+
+	public static BinaryMessage createFromStringMsgPack(String message) throws IOException {
+		MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
+		packer.packString(message);
+		packer.close();
+
+		return new BinaryMessage(packer.toByteArray());
 	}
 
 	@Override
@@ -219,7 +318,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 			String frame = notifyerConverter.convert(message);
 			WebSocketSession sessionForCid = webSocketSessions.get(cid);
 			if (sessionForCid != null ) {
-				sessionForCid.sendMessage(new TextMessage(frame));				
+				sendAnswerBackToClient(sessionForCid, frame);
 			}
 
 		}
@@ -257,6 +356,11 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		}
 		
 		return null;
+	}
+
+	@Override
+	public List<String> getSubProtocols() {
+		return Arrays.asList(SUB_PROTOCOL_TEXT, SUB_PROTOCOL_CBOR, SUB_PROTOCOL_MSGPACK);
 	}
 	
 }
