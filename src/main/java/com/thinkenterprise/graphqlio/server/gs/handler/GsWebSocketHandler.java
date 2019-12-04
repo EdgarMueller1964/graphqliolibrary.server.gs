@@ -43,6 +43,7 @@ import co.nstant.in.cbor.CborEncoder;
 import co.nstant.in.cbor.CborException;
 import co.nstant.in.cbor.model.ByteString;
 import co.nstant.in.cbor.model.DataItem;
+import graphql.GraphQLException;
 
 @Component
 public class GsWebSocketHandler extends AbstractWebSocketHandler implements ApplicationListener<WsfInboundFrameEvent>, SubProtocolCapable {
@@ -83,6 +84,13 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	@Override
 	public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
 
+		
+		// Client controls which protocol is used
+		// server just checks if protocol is supported.
+		// if there is no protocol information in message header 
+		// server tries to handle message as text message 
+		
+		
 		logger.info("GraphQLIO handleMessage received graphqlio message::getAcceptedProtocol = " + session.getAcceptedProtocol());
 
 		if (SUB_PROTOCOL_TEXT.equalsIgnoreCase(session.getAcceptedProtocol())
@@ -124,10 +132,6 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		logger.info("GraphQLIO handleCborMessage this :" + this);
 		logger.info("GraphQLIO handleCborMessage Thread :" + Thread.currentThread());
 
-		// vom Client muß geschickt werden, was hier erwartet wird.
-		// zunächst wird hier nur ein einzelner ByteString erwartet,
-		// der mit einem Query-String im richtigen Format gefüllt ist.
-
 		String input = getFromCbor(message);
 		logger.info("cbor.input = " + input);
 
@@ -144,10 +148,6 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		logger.info("GraphQLIO handleMsgPackMessage session ID :" + session.getId());
 		logger.info("GraphQLIO handleMsgPackMessage this :" + this);
 		logger.info("GraphQLIO handleMsgPackMessage Thread :" + Thread.currentThread());
-
-		// vom Client muß geschickt werden, was hier erwartet wird.
-		// zunächst wird hier nur ein einzelner String erwartet,
-		// der mit einem Query-String im richtigen Format gefüllt ist.
 
 		String input = getFromMsgPack(message);
 		logger.info("msgPack.input = " + input);
@@ -189,6 +189,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 				.build();
 
 		// Execute Message
+		// Exceptions are catched inside, transformed to GraphQLErrors and finally put into context response message
 		graphQLIOQueryExecution.execute(graphQLIOContext);
 
 		// Convert Result Message to Frame
@@ -196,27 +197,34 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 		// Send back
 		sendAnswerBackToClient(session, answerFrame);
-
-		// Evaluate Subscriptions and notify clients
-		List<String> sids = graphQLIOEvaluation.evaluateOutdatedSids(graphQLIOContext.getScope());
-
-		sids.forEach(sid -> {
-			logger.info("GraphQLIO Scope Evaluation: Scope ("+sid+") outdated");
-		});
 		
-		if ( sids.size() > 0) {
-			Map<String, Set<String>> sids4cid = graphQLIOEvaluation.evaluateOutdatedsSidsPerCid(sids,
-					webSocketConnections.values());			
+		try {
+			// Evaluate Subscriptions and notify clients
+			List<String> sids = graphQLIOEvaluation.evaluateOutdatedSids(graphQLIOContext.getScope());
 			
-			if ( sids4cid.size() > 0)
-				sendNotifierMessageToClients(sids4cid, requestMessage);
+			sids.forEach(sid -> {
+				logger.info(String.format("GraphQLIO Scope Evaluation: Scope (%s) outdated", sid));
+			});
+			
+			if ( !sids.isEmpty()) {
+				Map<String, Set<String>> sids4cid = graphQLIOEvaluation.evaluateOutdatedsSidsPerCid(sids,
+						webSocketConnections.values());			
+				
+				if ( sids4cid.size() > 0)
+					sendNotifierMessageToClients(sids4cid, requestMessage);
+			}
 		}
+		catch (GraphQLException e) {
+			logger.error(e.toString());				
+///			ToDo: Shall we notify client???			
+		}
+
 		
 	}
 
 	private void sendAnswerBackToClient(WebSocketSession session, String answerFrame) throws Exception {
 
-		logger.info("GraphQLIO sendAnswerBackToClient::getAcceptedProtocol = " + session.getAcceptedProtocol());
+		logger.info(String.format("GraphQLIO sendAnswerBackToClient::getAcceptedProtocol = %s",session.getAcceptedProtocol()));
 
 		if (SUB_PROTOCOL_TEXT.equalsIgnoreCase(session.getAcceptedProtocol())) {
 
@@ -240,10 +248,10 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		List<DataItem> dataItems = CborDecoder.decode(message.getPayload().array());
 
 		// wenn keine Exception:
-		if (dataItems == null || dataItems.size() < 1) {
+		if (dataItems == null || dataItems.isEmpty()) {
 			// logging
 
-		} else if (dataItems.size() >= 1) {
+		} else if (!dataItems.isEmpty()) {
 			if (dataItems.size() >= 2) {
 				// logging
 			}
@@ -267,11 +275,17 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	}
 
 	public static String getFromMsgPack(BinaryMessage message) throws IOException {
-		MessageUnpacker unpacker = MessagePack.newDefaultUnpacker(message.getPayload().array());
-
-		String input = unpacker.unpackString();
-		// logging
-		unpacker.close();
+		MessageUnpacker unpacker = null;
+		String input = null;
+		try {
+			unpacker = MessagePack.newDefaultUnpacker(message.getPayload().array());
+			input = unpacker.unpackString();
+			// logging			
+		}
+		finally {
+			if (unpacker != null)
+				unpacker.close();			
+		}
 
 		return input;
 	}
@@ -287,10 +301,15 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	}
 
 	public static BinaryMessage createFromStringMsgPack(String message) throws IOException {
-		MessageBufferPacker packer = MessagePack.newDefaultBufferPacker();
-		packer.packString(message);
-		packer.close();
-
+		MessageBufferPacker packer = null;
+		try {
+			packer = MessagePack.newDefaultBufferPacker();
+			packer.packString(message);
+		}
+		finally {
+			if (packer != null)
+				packer.close();			
+		}
 		return new BinaryMessage(packer.toByteArray());
 	}
 
@@ -336,7 +355,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 			webSocketSessions.get(event.getCid())
 					.sendMessage(new TextMessage(requestConverter.convert(event.getFrame())));
 		} catch (IOException e) {
-			e.printStackTrace();
+			logger.error("Error occured in GsWebSocketHandler.onApplicationEvent: ", e);
 		}
 	}
 
@@ -347,8 +366,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		final String REQUEST_MESSAGE_PART_TYPE_MUTATION = "mutation";
 		final String REQUEST_MESSAGE_PART_TYPE_SUBSCRIPTION = "_Subscription";
 		final String REQUEST_MESSAGE_PART_SCOPE_ID = "sid:";
-		
-		
+				
 		String message = StringUtils.deleteAny(requestMessage,  "\"");
 		message = StringUtils.deleteAny(message,  " ");
 		
@@ -357,24 +375,41 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 			int indexOf = message.indexOf(REQUEST_MESSAGE_PART_SCOPE_ID);
 			if (indexOf > 0) {
 				indexOf += REQUEST_MESSAGE_PART_SCOPE_ID.length();
-				if (message.length() >= indexOf + 36) { ///36=length of textual representation of UUID
-					String uuidString = message.substring(indexOf, indexOf+36);    
-					if ( uuidString.length() > 0) {
-						try {
-							UUID uuid = UUID.fromString(uuidString);
-							return uuidString;
-						}
-						catch( IllegalArgumentException e) {
-							logger.info("GsWebSocketHandler::getSubscriptionScopeId: uuidString (" + uuidString +") does not represent a valid UUID");
-						}						
-					}
-				}
 				
+				String uuidString = null;				
+				try {
+					uuidString = message.substring(indexOf, indexOf+36);
+					UUID uuid = isValidUUID(uuidString);
+					if (uuid != null) {
+						return uuidString;						
+					}
+					else {
+						logger.warn(String.format("GsWebSocketHandler.getSubscriptionScopeId: uuidString (%s) does not represent a valid UUID", uuidString));
+					}																
+				}
+				catch( IndexOutOfBoundsException e) {
+					logger.warn(String.format("GsWebSocketHandler.getSubscriptionScopeId: uuidString (%s) does not represent a valid UUID", uuidString));
+				}						
 			}			
 		}
 		
 		return null;
 	}
+	
+	
+	/// helper function
+	private UUID isValidUUID(String uuidString) {
+		UUID resultUUID = null;
+		try {
+			resultUUID = UUID.fromString(uuidString);   //throws exception if string does not represent a valid UUID 
+		}
+		catch( IllegalArgumentException e) {
+			resultUUID = null;
+		}						
+		return resultUUID;	
+	}
+	
+	
 
 	@Override
 	public List<String> getSubProtocols() {
