@@ -224,7 +224,8 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 	private void sendAnswerBackToClient(WebSocketSession session, String answerFrame) throws Exception {
 
-		logger.info(String.format("GraphQLIO sendAnswerBackToClient::getAcceptedProtocol = %s",session.getAcceptedProtocol()));
+		logger.info(String.format("GraphQLIO sendAnswerBackToClient::getAcceptedProtocol = %s", session.getAcceptedProtocol()));
+		logger.info(String.format("GraphQLIO sendAnswerBackToClient::answerFrame = %s", answerFrame));
 
 		if (SUB_PROTOCOL_TEXT.equalsIgnoreCase(session.getAcceptedProtocol())) {
 
