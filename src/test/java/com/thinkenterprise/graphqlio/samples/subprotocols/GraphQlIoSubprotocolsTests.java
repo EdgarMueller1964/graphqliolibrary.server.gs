@@ -32,6 +32,7 @@ import java.util.Arrays;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -47,14 +48,15 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.client.WebSocketClient;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 
+import com.thinkenterprise.graphqlio.samples.QueryResolver;
 import com.thinkenterprise.graphqlio.server.gs.handler.GsWebSocketHandler;
 import com.thinkenterprise.graphqlio.server.gs.server.GsServer;
 import com.thinkenterprise.graphqlio.server.gts.keyvaluestore.GtsGraphQLRedisService;
 
 /**
  * Class used to process any incoming message sent by clients via WebSocket
- * supports subprotocols (CBOR, MsgPack, Text)
- * triggers process to indicate outdating queries and notifies clients
+ * supports subprotocols (CBOR, MsgPack, Text) triggers process to indicate
+ * outdating queries and notifies clients
  *
  * @author Michael Schäfer
  * @author Torsten Kühnert
@@ -74,6 +76,9 @@ class GraphQlIoSubprotocolsTests {
 	@Autowired
 	private GtsGraphQLRedisService redisService;
 
+	@Autowired
+	private QueryResolver routeResolver;
+
 	@BeforeAll
 	private void startServers() throws IOException {
 		// 1st redis:
@@ -86,6 +91,11 @@ class GraphQlIoSubprotocolsTests {
 	private void stopServers() {
 		this.graphqlioServer.stop();
 		this.redisService.stop();
+	}
+
+	@BeforeEach
+	private void initRoutes() {
+		this.routeResolver.init();
 	}
 
 	private final String simpleQuery = "[1,0,\"GRAPHQL-REQUEST\",query { _Subscription { subscribe } _Subscription { subscribe } } ]";
