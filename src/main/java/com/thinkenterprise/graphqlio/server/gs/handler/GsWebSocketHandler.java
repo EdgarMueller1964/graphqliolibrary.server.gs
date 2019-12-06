@@ -77,7 +77,7 @@ import graphql.GraphQLException;
  *
  * @author Michael Schäfer
  * @author Dr. Edgar Müller
- * @author Torsten Kuehnert
+ * @author Torsten Kühnert
  */
 
 
