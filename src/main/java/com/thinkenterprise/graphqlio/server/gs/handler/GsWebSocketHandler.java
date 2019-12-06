@@ -56,6 +56,7 @@ import com.thinkenterprise.graphqlio.server.gs.execution.GsExecutionStrategy;
 import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSchemaCreator;
 import com.thinkenterprise.graphqlio.server.gs.server.GsContext;
 import com.thinkenterprise.graphqlio.server.gts.evaluation.GtsEvaluation;
+import com.thinkenterprise.graphqlio.server.gts.exceptions.GtsSubscriptionTypeException;
 import com.thinkenterprise.graphqlio.server.gts.tracking.GtsConnection;
 import com.thinkenterprise.graphqlio.server.gts.tracking.GtsScope;
 import com.thinkenterprise.graphqlio.server.wsf.converter.WsfConverter;
@@ -106,12 +107,12 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	private final GsGraphQLSchemaCreator gsGraphQLSchemaCreator;
 
 	@Autowired
-	public GsWebSocketHandler(ObjectMapper objectMapper, GsExecutionStrategy executionStrategy,
+	public GsWebSocketHandler(GsExecutionStrategy executionStrategy,
 			GtsEvaluation evaluation, GsGraphQLSchemaCreator schemaCreator) {
 
-		requestConverter = new WsfConverter(objectMapper, WsfFrameType.GRAPHQLREQUEST);
-		responseConverter = new WsfConverter(objectMapper, WsfFrameType.GRAPHQLRESPONSE);
-		notifyerConverter = new WsfConverter(objectMapper, WsfFrameType.GRAPHQLNOTIFIER);
+		requestConverter = new WsfConverter(WsfFrameType.GRAPHQLREQUEST);
+		responseConverter = new WsfConverter(WsfFrameType.GRAPHQLRESPONSE);
+		notifyerConverter = new WsfConverter(WsfFrameType.GRAPHQLNOTIFIER);
 		graphQLIOQueryExecution = executionStrategy;
 		graphQLIOEvaluation = evaluation;
 		gsGraphQLSchemaCreator = schemaCreator;
@@ -207,12 +208,28 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		/// ToDo: check if Scope generation could be delegated to (Gts-)Resolver
 		/// and gts library holds GtsConnection map resp. GtsScope list 
 		
-		String scopeId = this.getSubscriptionScopeId(requestMessage.getData());
+		String scopeId = null;
+		try {
+			scopeId = this.getSubscriptionScopeId(requestMessage.getData());
+		}
+		catch ( GtsSubscriptionTypeException e ){
+			
+			String graphQLConformError =
+					String.format("{\"errors\":[{\"message\":\"%s\"}]", e.getLocalizedMessage());
+			
+			WsfFrame errorMessage = WsfFrame.builder().fid(requestMessage.getFid()).rid(requestMessage.getRid())
+					.type(WsfFrameType.GRAPHQLRESPONSE).data(graphQLConformError).build();
+			
+			String answerFrame = responseConverter.convert(errorMessage);
+			// Send back
+			sendAnswerBackToClient(session, answerFrame);
+			return;
+		}
+
 		if (scopeId != null) {
 			scope = connection.getScopeById(scopeId);
 		}
-		
-		if (scope == null) {
+		else {
 			scope = GtsScope.builder()
 										.withQuery(requestMessage.getData())
 										.withConnectionId(connection.getConnectionId()).build();
@@ -400,34 +417,57 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 	/// check if message is a "Subscription - mutation" and contains valid UUID 
 	private String getSubscriptionScopeId( String requestMessage ) {
 		
+		final String REQUEST_MESSAGE_PART_TYPE_QUERY = "query";
 		final String REQUEST_MESSAGE_PART_TYPE_MUTATION = "mutation";
 		final String REQUEST_MESSAGE_PART_TYPE_SUBSCRIPTION = "_Subscription";
 		final String REQUEST_MESSAGE_PART_SCOPE_ID = "sid:";
+		final String REQUEST_MESSAGE_PART_METHOD_UNSUBSCRIBE = "unsubscribe";
+		final String REQUEST_MESSAGE_PART_METHOD_PAUSE = "pause";
+		final String REQUEST_MESSAGE_PART_METHOD_RESUME = "resume";
 				
 		String message = StringUtils.deleteAny(requestMessage,  "\"");
 		message = StringUtils.deleteAny(message,  " ");
 		
-		if (message.contains(REQUEST_MESSAGE_PART_TYPE_MUTATION)  &&  
-				message.contains(REQUEST_MESSAGE_PART_TYPE_SUBSCRIPTION)) {
-			int indexOf = message.indexOf(REQUEST_MESSAGE_PART_SCOPE_ID);
-			if (indexOf > 0) {
-				indexOf += REQUEST_MESSAGE_PART_SCOPE_ID.length();
-				
-				String uuidString = null;				
-				try {
-					uuidString = message.substring(indexOf, indexOf+36);
-					UUID uuid = isValidUUID(uuidString);
-					if (uuid != null) {
-						return uuidString;						
+		if (message.contains(REQUEST_MESSAGE_PART_TYPE_SUBSCRIPTION)) {
+			if (message.contains(REQUEST_MESSAGE_PART_TYPE_MUTATION)) {
+				int indexOf = message.indexOf(REQUEST_MESSAGE_PART_SCOPE_ID);
+				if (indexOf > 0) {
+					indexOf += REQUEST_MESSAGE_PART_SCOPE_ID.length();
+					
+					String uuidString = null;				
+					try {
+						uuidString = message.substring(indexOf, indexOf+36);
+						UUID uuid = isValidUUID(uuidString);
+						if (uuid != null) {
+							return uuidString;						
+						}
+						else {
+							throw new GtsSubscriptionTypeException(String.format("GsWebSocketHandler.getSubscriptionScopeId: uuidString (%s) does not represent a valid UUID", uuidString));
+						}																
 					}
-					else {
-						logger.warn(String.format("GsWebSocketHandler.getSubscriptionScopeId: uuidString (%s) does not represent a valid UUID", uuidString));
-					}																
+					catch( IndexOutOfBoundsException e) {
+						throw new GtsSubscriptionTypeException(String.format("GsWebSocketHandler.getSubscriptionScopeId: uuidString (%s) does not represent a valid UUID", uuidString));					
+					}						
 				}
-				catch( IndexOutOfBoundsException e) {
-					logger.warn(String.format("GsWebSocketHandler.getSubscriptionScopeId: uuidString (%s) does not represent a valid UUID", uuidString));
-				}						
-			}			
+				else {  
+					//// no scope id (sid) parameter				
+					throw new GtsSubscriptionTypeException("GsWebSocketHandler.getSubscriptionScopeId: expect parameter <sid> for _Subscription");				
+				}
+			}
+			else if (message.contains(REQUEST_MESSAGE_PART_TYPE_QUERY)) {
+				if (((message.contains(REQUEST_MESSAGE_PART_METHOD_UNSUBSCRIBE) ||
+						  message.contains(REQUEST_MESSAGE_PART_METHOD_PAUSE)	 ||
+						  message.contains(REQUEST_MESSAGE_PART_METHOD_RESUME) )) ) {	
+					//// query/unsubscribe/pause/resume   not supported
+					throw new GtsSubscriptionTypeException("GsWebSocketHandler.getSubscriptionScopeId: expect _Subscription of type MUTATION");				
+				}
+				else {
+					/// regular query message
+					return null;
+				}				
+			} else 
+				//// only QUERY or MUTATION messages supported
+				throw new GtsSubscriptionTypeException("GsWebSocketHandler.getSubscriptionScopeId: only QUERY or MUTATION messages supported");								
 		}
 		
 		return null;
