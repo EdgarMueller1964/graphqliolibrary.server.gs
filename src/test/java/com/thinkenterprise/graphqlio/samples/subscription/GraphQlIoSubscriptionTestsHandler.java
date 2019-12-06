@@ -42,8 +42,8 @@ import com.thinkenterprise.graphqlio.server.gs.handler.GsWebSocketHandler;
 
 /**
  * Class used to process any incoming message sent by clients via WebSocket
- * supports subprotocols (CBOR, MsgPack, Text)
- * triggers process to indicate outdating queries and notifies clients
+ * supports subprotocols (CBOR, MsgPack, Text) triggers process to indicate
+ * outdating queries and notifies clients
  *
  * @author Michael Schäfer
  * @author Torsten Kühnert
@@ -61,11 +61,7 @@ public class GraphQlIoSubscriptionTestsHandler extends AbstractWebSocketHandler 
 	public int notifier_count = 0;
 
 	public List<Route> routes = new ArrayList<Route>();
-	private List<String> subscriptionIds = new ArrayList<String>();
-
-	public GraphQlIoSubscriptionTestsHandler(List<String> subscriptionIds) {
-		this.subscriptionIds = subscriptionIds;
-	}
+	public List<String> subscriptionIds = new ArrayList<String>();
 
 	@Override
 	public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
