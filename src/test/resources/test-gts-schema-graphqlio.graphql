@@ -1,0 +1,24 @@
+
+extend type Query {
+	_Subscription: GraphQLIOSubscription
+}
+
+extend type Mutation {
+	_Subscription: GraphQLIOSubscription
+}
+
+type GraphQLIOSubscription {
+	subscribe: UUID!
+	unsubscribe(sid: UUID!): Void
+	subscriptions: String
+	pause(sid: UUID!): Void
+	resume(sid: UUID!): Void
+}
+
+scalar UUID
+
+scalar Date
+
+scalar JSON
+
+scalar Void
