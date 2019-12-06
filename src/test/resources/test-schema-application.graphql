@@ -1,10 +1,31 @@
+
 schema {
    query: Query
    mutation: Mutation
 }
 
 type Query {
+	routes: [Route]!
 }
 
-type Mutation{
+type Mutation {
+	updateRoute(flightNumber: String!, input: RouteInput!): Route
+}
+
+type Route {
+	flightNumber: String!
+	departure: String
+	destination: String
+	disabled: Boolean
+	signature: UUID
+	bookingDate: Date
+}
+
+input RouteInput {
+	flightNumber: String!
+	departure: String
+	destination: String
+	disabled: Boolean
+	signature: UUID
+	bookingDate: Date
 }
