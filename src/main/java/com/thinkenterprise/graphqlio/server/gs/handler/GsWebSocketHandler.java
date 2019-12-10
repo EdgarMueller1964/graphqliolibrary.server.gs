@@ -1,28 +1,29 @@
-/*
-**  Design and Development by msg Applied Technology Research
-**  Copyright (c) 2019-2020 msg systems ag (http://www.msg-systems.com/)
-**  All Rights Reserved.
-** 
-**  Permission is hereby granted, free of charge, to any person obtaining
-**  a copy of this software and associated documentation files (the
-**  "Software"), to deal in the Software without restriction, including
-**  without limitation the rights to use, copy, modify, merge, publish,
-**  distribute, sublicense, and/or sell copies of the Software, and to
-**  permit persons to whom the Software is furnished to do so, subject to
-**  the following conditions:
-**
-**  The above copyright notice and this permission notice shall be included
-**  in all copies or substantial portions of the Software.
-**
-**  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-**  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-**  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-**  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-**  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-**  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-**  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
+/*******************************************************************************
+ * *
+ * **  Design and Development by msg Applied Technology Research
+ * **  Copyright (c) 2019-2020 msg systems ag (http://www.msg-systems.com/)
+ * **  All Rights Reserved.
+ * ** 
+ * **  Permission is hereby granted, free of charge, to any person obtaining
+ * **  a copy of this software and associated documentation files (the
+ * **  "Software"), to deal in the Software without restriction, including
+ * **  without limitation the rights to use, copy, modify, merge, publish,
+ * **  distribute, sublicense, and/or sell copies of the Software, and to
+ * **  permit persons to whom the Software is furnished to do so, subject to
+ * **  the following conditions:
+ * **
+ * **  The above copyright notice and this permission notice shall be included
+ * **  in all copies or substantial portions of the Software.
+ * **
+ * **  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * **  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * **  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * **  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * **  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * **  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * **  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * *
+ ******************************************************************************/
 package com.thinkenterprise.graphqlio.server.gs.handler;
 
 import java.io.ByteArrayOutputStream;
@@ -52,6 +53,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thinkenterprise.graphqlio.server.gs.actuator.custom.GsGraphqlioCounterEndpoint;
 import com.thinkenterprise.graphqlio.server.gs.execution.GsExecutionStrategy;
 import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSchemaCreator;
 import com.thinkenterprise.graphqlio.server.gs.server.GsContext;
@@ -106,6 +108,10 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 	private final GsGraphQLSchemaCreator gsGraphQLSchemaCreator;
 
+	
+	@Autowired
+	GsGraphqlioCounterEndpoint gsGraphqlioCounterEndpoint;
+	
 	@Autowired
 	public GsWebSocketHandler(GsExecutionStrategy executionStrategy,
 			GtsEvaluation evaluation, GsGraphQLSchemaCreator schemaCreator) {
@@ -232,7 +238,9 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		else {
 			scope = GtsScope.builder()
 										.withQuery(requestMessage.getData())
-										.withConnectionId(connection.getConnectionId()).build();
+										.withConnectionId(connection.getConnectionId())
+										.withGtsCounter(gsGraphqlioCounterEndpoint)
+										.build();
 			connection.addScope(scope);			
 		}
 
@@ -369,20 +377,30 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 	@Override
 	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-		webSocketConnections.put(session.getId(), GtsConnection.builder().fromSession(session).build());
-		webSocketSessions.put(session.getId(), session);
+		webSocketConnections.put(session.getId(), 
+				GtsConnection.builder()
+					.fromSession(session)
+					.withGtsCounter(gsGraphqlioCounterEndpoint)
+					.build());
+		webSocketSessions.put(session.getId(), session);		
 	}
 
 	@Override
 	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
 		GtsConnection connection = webSocketConnections.get(session.getId());
 		if (connection != null) {
-			/// connection scopes are implicitly garbage collected once connection is not referenced anymore
-			graphQLIOEvaluation.onCloseConnection(connection.getConnectionId());
+
+			///   remove entries from key value store
+	    	this.graphQLIOEvaluation.onCloseConnection(connection.getConnectionId());
+			
+			/// remove scopes from list in connections
+			connection.onClose();
 			
 		}		
 		webSocketConnections.remove(session.getId());
 		webSocketSessions.remove(session.getId());
+		
+		
 	}
 
 	private void sendNotifierMessageToClients(Map<String, Set<String>> sids4cid, WsfFrame requestMessage)

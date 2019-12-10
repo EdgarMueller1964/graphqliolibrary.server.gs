@@ -20,7 +20,7 @@
 
 	<dependencies>
 	
-		<!-- GraphQL IO Application-->
+		<!-- GraphQL IO Libraries -->
 
 		<dependency>
 			<groupId>com.thinkenterprise.graphqlio.server.gtt</groupId>
@@ -39,11 +39,14 @@
 			<artifactId>com.thinkenterprise.graphqlio.server.wsf</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
-	
+		
+		<!-- Spring Boot Web  -->
+		
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-actuator</artifactId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
@@ -54,18 +57,7 @@
 			<artifactId>spring-boot-starter-json</artifactId>
 		</dependency>
 
-		<!-- Spring Boot Data with JPA -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
 
-		<!-- Spring Boot In Memory Data Server -->
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-		</dependency>
-		
 		<!-- GraphQL IO -->
 		
 		<!--  CBOR, msgPack Encoding -->
@@ -92,6 +84,7 @@
 			<artifactId>graphql-java-tools</artifactId>
 			<version>5.6.0</version>
 		</dependency>
+
 		<!-- GraphQL Tools Fix -->
 				
 		<dependency>
@@ -113,38 +106,42 @@
         </dependency>
 -->		
 		
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-websocket</artifactId>
-		</dependency>
+		<!-- Key Value Store Redis-->
 
-
-		<!-- Key Value Store -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
 		
-		<!-- 
-		<dependency>
-		  <groupId>it.ozimov</groupId>
-		  <artifactId>embedded-redis</artifactId>
-		  <version>0.7.2</version>
-		  <scope>test</scope>
-		</dependency>
-		
-		<dependency>
-		<groupId>com.github.caryyu</groupId>
-		<artifactId>spring-embedded-redis-server</artifactId>
-		<version>1.1</version>
-		</dependency>		
-		 -->
-
 		<dependency>
 			<groupId>com.github.kstyrc</groupId>
 			<artifactId>embedded-redis</artifactId>
 			<version>0.6</version>
 		</dependency>
+
+
+		<!-- Spring Boot Actuator  -->
+	
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+
+		<!-- Spring Boot Data with JPA (only required for samples )-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!-- Spring Boot In Memory Data Server -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+		</dependency>
+		
+
+		<!-- Dev Tools -->
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
