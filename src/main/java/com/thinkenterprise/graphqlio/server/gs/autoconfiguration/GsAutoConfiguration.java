@@ -38,6 +38,7 @@ import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSchemaCre
 import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSimpleSchemaCreator;
 import com.thinkenterprise.graphqlio.server.gs.handler.GsWebSocketHandler;
 import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
+import com.thinkenterprise.graphqlio.server.gts.evaluation.GtsEvaluation;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -67,6 +68,19 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
 	@Autowired
 	private GsProperties gsProperties;
 	
+	@Autowired
+	private GtsEvaluation gtsEvaluation;
+
+	@Autowired
+	private GsGraphQLSchemaCreator gsSchemaCreator;
+	
+	@Autowired
+	private GsExecutionStrategy gsExecutionStategy;	
+	
+	@Autowired
+	private GtsCounter gsGtsCounter;
+	
+	
 	
 	@Autowired
 	private GsWebSocketHandler handler;
@@ -85,13 +99,13 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
 	
 	@Bean
 	@ConditionalOnMissingBean
-	public GsExecutionStrategy graphQLIOQueryExecutionStrategy() {
+	public GsExecutionStrategy gsGraphQLExecution() {
 		return new GsGraphQLExecution();
 	}
 	
 	@Bean
 	@ConditionalOnMissingBean
-	public GtsCounter gtsCounter() {
+	public GtsCounter gsGtsCounter() {
 		return new GsGraphqlioCounterEndpoint();
 	}
 	
@@ -106,8 +120,20 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
 
         return mapper;
     }
+		
+	@Bean
+	@ConditionalOnMissingBean
+	public GsWebSocketHandler gsWebSocketHandler() {
+		return new GsWebSocketHandler	( gsExecutionStategy
+										, gtsEvaluation
+										, gsSchemaCreator
+										, gsGtsCounter
+				);
 
+	}
 	
+	
+
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {	 
     	registry.addHandler(this.handler, gsProperties.getEndpoint());   
 	}

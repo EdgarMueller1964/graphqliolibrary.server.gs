@@ -52,11 +52,11 @@ import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkenterprise.graphqlio.server.gs.actuator.custom.GsGraphqlioCounterEndpoint;
 import com.thinkenterprise.graphqlio.server.gs.execution.GsExecutionStrategy;
 import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSchemaCreator;
 import com.thinkenterprise.graphqlio.server.gs.server.GsContext;
+import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
 import com.thinkenterprise.graphqlio.server.gts.evaluation.GtsEvaluation;
 import com.thinkenterprise.graphqlio.server.gts.exceptions.GtsSubscriptionTypeException;
 import com.thinkenterprise.graphqlio.server.gts.tracking.GtsConnection;
@@ -84,7 +84,7 @@ import graphql.GraphQLException;
  */
 
 
-@Component
+//@Component
 public class GsWebSocketHandler extends AbstractWebSocketHandler implements ApplicationListener<WsfInboundFrameEvent>, SubProtocolCapable {
 
 	public static final String SUB_PROTOCOL_TEXT = "text";
@@ -108,13 +108,11 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 	private final GsGraphQLSchemaCreator gsGraphQLSchemaCreator;
 
-	
-	@Autowired
-	GsGraphqlioCounterEndpoint gsGraphqlioCounterEndpoint;
+	private final GtsCounter gsGtsCounter;
 	
 	@Autowired
 	public GsWebSocketHandler(GsExecutionStrategy executionStrategy,
-			GtsEvaluation evaluation, GsGraphQLSchemaCreator schemaCreator) {
+			GtsEvaluation evaluation, GsGraphQLSchemaCreator schemaCreator, GtsCounter gtsCounter) {
 
 		requestConverter = new WsfConverter(WsfFrameType.GRAPHQLREQUEST);
 		responseConverter = new WsfConverter(WsfFrameType.GRAPHQLRESPONSE);
@@ -122,6 +120,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		graphQLIOQueryExecution = executionStrategy;
 		graphQLIOEvaluation = evaluation;
 		gsGraphQLSchemaCreator = schemaCreator;
+		gsGtsCounter = gtsCounter;
 	}
 
 	@Override
@@ -239,7 +238,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 			scope = GtsScope.builder()
 										.withQuery(requestMessage.getData())
 										.withConnectionId(connection.getConnectionId())
-										.withGtsCounter(gsGraphqlioCounterEndpoint)
+										.withGtsCounter(gsGtsCounter)
 										.build();
 			connection.addScope(scope);			
 		}
@@ -251,7 +250,9 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 
 		// Execute Message
 		// Exceptions are catched inside, transformed to GraphQLErrors and finally put into context response message
+		logger.info("GraphQLIO start executing graphQLIOContext ....");
 		graphQLIOQueryExecution.execute(graphQLIOContext);
+		logger.info("GraphQLIO finished execution of graphQLIOContext ....");
 
 		// Convert Result Message to Frame
 		String answerFrame = responseConverter.convert(graphQLIOContext.getResponseMessage());
@@ -260,8 +261,14 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		sendAnswerBackToClient(session, answerFrame);
 		
 		try {
+			
+			logger.info("GraphQLIOEvaluation Evaluating outdated Scopes ....");
+			
 			// Evaluate Subscriptions and notify clients
 			List<String> sids = graphQLIOEvaluation.evaluateOutdatedSids(graphQLIOContext.getScope());
+
+			logger.info("GraphQLIOEvaluation Finished Evaluating outdated Scopes ....");
+			
 			
 			sids.forEach(sid -> {
 				logger.info(String.format("GraphQLIO Scope Evaluation: Scope (%s) outdated", sid));
@@ -380,7 +387,7 @@ public class GsWebSocketHandler extends AbstractWebSocketHandler implements Appl
 		webSocketConnections.put(session.getId(), 
 				GtsConnection.builder()
 					.fromSession(session)
-					.withGtsCounter(gsGraphqlioCounterEndpoint)
+					.withGtsCounter(gsGtsCounter)
 					.build());
 		webSocketSessions.put(session.getId(), session);		
 	}
