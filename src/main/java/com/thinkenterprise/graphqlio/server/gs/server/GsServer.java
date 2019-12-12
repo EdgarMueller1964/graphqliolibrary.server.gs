@@ -32,6 +32,15 @@ import org.springframework.stereotype.Service;
 import com.thinkenterprise.graphqlio.server.gs.graphql.GsGraphQLService;
 import com.thinkenterprise.graphqlio.server.gts.keyvaluestore.GtsKeyValueStore;
 
+/**
+ * Main Server (Service) responsible to start GraphQL service
+ * Application needs inject service and run start command 
+ *
+ * @author Michael Schäfer
+ * @author Dr. Edgar Müller
+ */
+
+
 @Service
 public class GsServer {
 

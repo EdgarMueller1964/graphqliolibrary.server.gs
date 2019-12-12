@@ -33,6 +33,13 @@ import org.springframework.stereotype.Component;
 import graphql.GraphQL;
 import graphql.schema.GraphQLSchema;
 
+
+/**
+ * Component responsible to create GraphQL engine based on GraphQL Schema 
+ *
+ * @author Michael Schäfer
+ * @author Dr. Edgar Müller
+ */
 @Component
 public class GsGraphQLEngine {
 

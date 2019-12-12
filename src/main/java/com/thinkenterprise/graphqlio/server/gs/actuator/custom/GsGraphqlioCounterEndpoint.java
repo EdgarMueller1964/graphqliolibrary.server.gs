@@ -47,7 +47,6 @@ import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
 
 
 @Endpoint(id="graphqliocounter")
-@Component
 public class GsGraphqlioCounterEndpoint implements GtsCounter {
 
 	private static String CONNECTIONS = "connections";
@@ -118,28 +117,5 @@ public class GsGraphqlioCounterEndpoint implements GtsCounter {
     public void deleteCounter(@Selector String name) {
         counters.remove(name);
     }	
-	
-	
-//	@ReadOperation
-//	public int countConnections() {
-//		return 0;
-//	}
-	
-//	@ReadOperation
-//	public int countScopes() {
-//		return 0;
-//	}
-//
-//	@ReadOperation
-//	public int countScopeRecords() {
-//		return 0;
-//	}
-//
-//	@ReadOperation
-//	public long countMaxEvaluationTime() {
-//		return 0;
-//	}
-	
-	
-	
+		
 }

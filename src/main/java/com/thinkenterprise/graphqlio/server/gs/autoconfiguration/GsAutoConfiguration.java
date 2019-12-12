@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.thinkenterprise.graphqlio.server.gs.actuator.custom.GsGraphqlioCounterEndpoint;
+import com.thinkenterprise.graphqlio.server.gs.actuator.metrics.GsGraphqlioMeterRegistryCounter;
 import com.thinkenterprise.graphqlio.server.gs.execution.GsExecutionStrategy;
 import com.thinkenterprise.graphqlio.server.gs.graphql.GsGraphQLExecution;
 import com.thinkenterprise.graphqlio.server.gs.graphql.GsGraphQLService;
@@ -40,12 +41,18 @@ import com.thinkenterprise.graphqlio.server.gs.handler.GsWebSocketHandler;
 import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
 import com.thinkenterprise.graphqlio.server.gts.evaluation.GtsEvaluation;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
@@ -67,24 +74,10 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
 
 	@Autowired
 	private GsProperties gsProperties;
-	
-	@Autowired
-	private GtsEvaluation gtsEvaluation;
-
-	@Autowired
-	private GsGraphQLSchemaCreator gsSchemaCreator;
-	
-	@Autowired
-	private GsExecutionStrategy gsExecutionStategy;	
-	
-	@Autowired
-	private GtsCounter gsGtsCounter;
-	
-	
-	
+		
 	@Autowired
 	private GsWebSocketHandler handler;
-
+	
 	@Bean
 	@ConditionalOnMissingBean
 	public GsGraphQLSchemaCreator gsGraphQLSchemaCreator() {
@@ -102,14 +95,24 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
 	public GsExecutionStrategy gsGraphQLExecution() {
 		return new GsGraphQLExecution();
 	}
-	
+
 	@Bean
 	@ConditionalOnMissingBean
-	public GtsCounter gsGtsCounter() {
+	@ConditionalOnProperty(
+		    value="graphqliocounter", 
+		    havingValue = "true",
+		    matchIfMissing = false)	
+	public GtsCounter gsGraphqlioGtsCounter() {
 		return new GsGraphqlioCounterEndpoint();
 	}
 	
-			
+	@Bean
+	@ConditionalOnMissingBean
+	public GtsCounter gsMetricsGtsCounter(MeterRegistry simpleRegistry) {
+		return new GsGraphqlioMeterRegistryCounter(simpleRegistry);
+	}
+	
+	
 	@Bean
 	public ObjectMapper createObjectMapper() {
         ObjectMapper mapper = new ObjectMapper().disable(SerializationFeature.FAIL_ON_EMPTY_BEANS).registerModule(new Jdk8Module());
@@ -123,7 +126,11 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
 		
 	@Bean
 	@ConditionalOnMissingBean
-	public GsWebSocketHandler gsWebSocketHandler() {
+	public GsWebSocketHandler gsWebSocketHandler( GsExecutionStrategy gsExecutionStategy
+												, GtsEvaluation gtsEvaluation
+												, GsGraphQLSchemaCreator gsSchemaCreator
+												, GtsCounter gsGtsCounter
+												) {
 		return new GsWebSocketHandler	( gsExecutionStategy
 										, gtsEvaluation
 										, gsSchemaCreator

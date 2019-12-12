@@ -35,6 +35,15 @@ import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSchemaCre
 import graphql.GraphQL;
 import graphql.schema.GraphQLSchema;
 
+
+/**
+ * Service responsible to instantiate GraphQL Schema Creator and GraphQL Engine
+ *
+ * @author Michael Schäfer
+ * @author Dr. Edgar Müller
+ */
+
+
 @Service
 @Scope("singleton")
 public class GsGraphQLService {
