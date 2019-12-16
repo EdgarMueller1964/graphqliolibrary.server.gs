@@ -39,6 +39,7 @@ import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSchemaCre
 import com.thinkenterprise.graphqlio.server.gs.graphql.schema.GsGraphQLSimpleSchemaCreator;
 import com.thinkenterprise.graphqlio.server.gs.handler.GsWebSocketHandler;
 import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
+import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounterNotification;
 import com.thinkenterprise.graphqlio.server.gts.evaluation.GtsEvaluation;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -95,21 +96,20 @@ public class GsAutoConfiguration implements WebSocketConfigurer {
 	public GsExecutionStrategy gsGraphQLExecution() {
 		return new GsGraphQLExecution();
 	}
-
+	
 	@Bean
 	@ConditionalOnMissingBean
 	@ConditionalOnProperty(
 		    value="graphqliocounter", 
-		    havingValue = "true",
-		    matchIfMissing = false)	
-	public GtsCounter gsGraphqlioGtsCounter() {
-		return new GsGraphqlioCounterEndpoint();
+		    havingValue = "true")	
+	public GsGraphqlioCounterEndpoint gsGraphqlioGtsCounter(GtsCounter gtsCounter) {
+		return new GsGraphqlioCounterEndpoint(gtsCounter);
 	}
 	
 	@Bean
 	@ConditionalOnMissingBean
-	public GtsCounter gsMetricsGtsCounter(MeterRegistry simpleRegistry) {
-		return new GsGraphqlioMeterRegistryCounter(simpleRegistry);
+	public GsGraphqlioMeterRegistryCounter gsMetricsGtsCounter(MeterRegistry simpleRegistry, GtsCounter gtsCounter) {
+		return new GsGraphqlioMeterRegistryCounter(simpleRegistry, gtsCounter);
 	}
 	
 	

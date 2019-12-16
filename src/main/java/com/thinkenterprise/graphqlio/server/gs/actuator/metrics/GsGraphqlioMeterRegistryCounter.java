@@ -29,6 +29,8 @@ package com.thinkenterprise.graphqlio.server.gs.actuator.metrics;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
+import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounterNames;
+import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounterNotification;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -39,13 +41,16 @@ import io.micrometer.core.instrument.MeterRegistry;
  * @author Michael Schäfer
  * @author Dr. Edgar Müller
  */
-public class GsGraphqlioMeterRegistryCounter implements GtsCounter {
+public class GsGraphqlioMeterRegistryCounter implements GtsCounterNotification {
 
 	private MeterRegistry meterRegistry;
+	private GtsCounter gtsCounter;
 	
-	public GsGraphqlioMeterRegistryCounter(MeterRegistry meterRegistry) {
+	public GsGraphqlioMeterRegistryCounter(MeterRegistry meterRegistry, GtsCounter gtsCounter) {
 		this.meterRegistry = meterRegistry;
+		this.gtsCounter = gtsCounter;
 		initMetricsCounter();
+		gtsCounter.registerCounterNotification(this);
 	}
 
 	AtomicLong connectionCount = new AtomicLong(0L);
@@ -72,49 +77,27 @@ public class GsGraphqlioMeterRegistryCounter implements GtsCounter {
 	}
 	
 	@Override
-	public void incrementConnectionCounter() {
-		connectionCount.incrementAndGet();
-	}
+	public void onModifiedCounter(GtsCounterNames counterName, long byNumber) {
+		
+		switch (counterName) {
+		case CONNECTIONS:
+			connectionCount.addAndGet(byNumber);
+			break;
 
-	@Override
-	public void decrementConnectionCounter() {
-		connectionCount.decrementAndGet();
-	}
+		case SCOPES:
+			scopeCount.addAndGet(byNumber);
+			break;
 
-	@Override
-	public void decrementConnectionCounter(long byNumber) {
-		connectionCount.addAndGet(0-byNumber);
-	}
+		case RECORDS:
+			recordCount.addAndGet(byNumber);
+			break;
 
-	@Override
-	public void incrementScopeCounter() {
-		scopeCount.incrementAndGet();
-	}
-
-	@Override
-	public void decrementScopeCounter() {
-		scopeCount.decrementAndGet();
-	}
-
-	@Override
-	public void decrementScopeCounter(long byNumber) {
-		scopeCount.addAndGet(0-byNumber);
-	}
-
-	@Override
-	public void incrementRecordCounter() {
-		recordCount.incrementAndGet();
-	}
-
-	@Override
-	public void decrementRecordCounter() {
-		scopeCount.decrementAndGet();
-	}
-
-	@Override
-	public void decrementRecordCounter(long byNumber) {
-		recordCount.addAndGet(0-byNumber);
-
+		default:
+			break;
+		}
+		
+		
+		
 	}
 
 }

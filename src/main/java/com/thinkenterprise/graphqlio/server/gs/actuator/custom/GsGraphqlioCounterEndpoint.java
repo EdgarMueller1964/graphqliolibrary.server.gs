@@ -29,6 +29,7 @@ package com.thinkenterprise.graphqlio.server.gs.actuator.custom;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.endpoint.annotation.DeleteOperation;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
@@ -37,6 +38,8 @@ import org.springframework.boot.actuate.endpoint.annotation.WriteOperation;
 import org.springframework.stereotype.Component;
 
 import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
+import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounterNames;
+import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounterNotification;
 
 /**
  * Class defining custom endpoint for optional information about running graphqlio application 
@@ -47,54 +50,24 @@ import com.thinkenterprise.graphqlio.server.gts.actuator.GtsCounter;
 
 
 @Endpoint(id="graphqliocounter")
-public class GsGraphqlioCounterEndpoint implements GtsCounter {
+public class GsGraphqlioCounterEndpoint implements GtsCounterNotification {
 
-	private static String CONNECTIONS = "connections";
-	private static String SCOPES = "scopes";
-	private static String RECORDS = "records";
-	
-	
+
 	private Map<String, Long> counters = new ConcurrentHashMap<>();	
-
-	/// initialize counter
-	{
-		writeCounter(CONNECTIONS, 0L);
-		writeCounter(SCOPES, 0L);
-		writeCounter(RECORDS, 0L);
-	}
 	
+	@Autowired
+	GtsCounter gtsCounter;
 	
-	public synchronized void incrementConnectionCounter() {
-		counters.put(CONNECTIONS, (long)counters.get(CONNECTIONS).longValue()+1);
-	}
-	public synchronized void decrementConnectionCounter() {
-		counters.put(CONNECTIONS, (long)counters.get(CONNECTIONS).longValue()-1);
-	}
-	public synchronized void decrementConnectionCounter(long byNumber) {
-		counters.put(CONNECTIONS, (long)counters.get(CONNECTIONS).longValue()-byNumber);
-	}
+	public GsGraphqlioCounterEndpoint( GtsCounter gtsCounter) {
+		this.gtsCounter = gtsCounter;
+		this.gtsCounter.registerCounterNotification(this);
 
-	/// GtsScopeCounter
-	public synchronized void incrementScopeCounter() {
-		counters.put(SCOPES, (long)counters.get(SCOPES).longValue()+1);
-	}
-	public synchronized void decrementScopeCounter() {
-		counters.put(SCOPES, (long)counters.get(SCOPES).longValue()-1);
-	}
-	public synchronized void decrementScopeCounter(long byNumber) {
-		counters.put(SCOPES, (long)counters.get(SCOPES).longValue()-byNumber);
-	}
-
-	
-	/// GtsRecordCounter
-	public synchronized void incrementRecordCounter() {
-		counters.put(RECORDS, (long)counters.get(RECORDS).longValue()+1);
-	}
-	public synchronized void decrementRecordCounter() {
-		counters.put(RECORDS, (long)counters.get(RECORDS).longValue()-1);
-	}
-	public synchronized void decrementRecordCounter(long byNumber) {
-		counters.put(RECORDS, (long)counters.get(RECORDS).longValue()-byNumber);
+		
+		/// initialize counter
+		for (GtsCounterNames counterNames: this.gtsCounter.getCounters()) {
+			writeCounter(counterNames.toString(), 0L);
+		}
+		
 	}
 	
 	@ReadOperation
@@ -116,6 +89,11 @@ public class GsGraphqlioCounterEndpoint implements GtsCounter {
     @DeleteOperation
     public void deleteCounter(@Selector String name) {
         counters.remove(name);
-    }	
+    }
+
+	@Override
+	public synchronized void onModifiedCounter(GtsCounterNames counterName, long byNumber) {		
+		counters.put(counterName.toString(), (long)counters.get(counterName.toString()).longValue() + byNumber);				
+	}	
 		
 }
